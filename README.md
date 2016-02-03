@@ -4,7 +4,7 @@ This plugin enables communication between a phone and Bluetooth Low Energy (BLE)
 
 The plugin provides a simple [JavaScript API](#api) for iOS and Android.
 
- * Scan for peripherals
+ * Scan for peripherals (LE and Classic)
  * Connect to a peripheral
  * Read the value of a characteristic
  * Write new value to a characteristic
@@ -27,29 +27,18 @@ See the [examples](https://github.com/don/cordova-plugin-ble-central/tree/master
 
 ### Cordova
 
-    $ cordova plugin add cordova-plugin-ble-central
+    $ cordova plugin add https://github.com/KinG-InFeT/cordova-plugin-ble-central.git
 
 ### PhoneGap
 
-    $ phonegap plugin add cordova-plugin-ble-central
-
-### PhoneGap Build
-
-Edit config.xml to install the plugin for [PhoneGap Build](http://build.phonegap.com).
-
-    <gap:plugin name="cordova-plugin-ble-central" source="npm" />
-
-### PhoneGap Developer App
-
-This plugin is included in iOS and Android versions of the [PhoneGap Developer App](http://app.phonegap.com/).
-
-Note that this plugin's id changed from `com.megster.cordova.ble` to `cordova-plugin-ble-central` as part of the migration from the [Cordova plugin repo](http://plugins.cordova.io/) to [npm](https://www.npmjs.com/).
+    $ phonegap plugin add https://github.com/KinG-InFeT/cordova-plugin-ble-central.git
 
 # API
 
 ## Methods
 
 - [ble.scan](#scan)
+- [ble.scanClassic](#scanClassic)
 - [ble.startScan](#startscan)
 - [ble.stopScan](#stopscan)
 - [ble.connect](#connect)
@@ -95,6 +84,44 @@ Advertising information format varies depending on your platform. See [Advertisi
     ble.scan([], 5, function(device) {
         console.log(JSON.stringify(device));
     }, failure);
+    
+
+## scanClassic
+
+Scan and discover Bluetooth Classic.
+
+    ble.scanClassic(services, seconds, success, failure);
+
+### Description
+
+Function `scan` scans for BLE devices.  The success callback is called each time a peripheral is discovered. Scanning automatically stops after the specified number of seconds.
+
+    {
+        "DB:AS:AS:23:12:23",
+        "DB:AS:AS:23:11:23",
+        "DB:AS:AS:23:33:23",
+    }
+
+Advertising information format varies depending on your platform. See [Advertising Data](#advertising-data) for more information.
+
+### Parameters
+
+- __services__: List of services to discover, or [] to find all devices
+- __seconds__: Number of seconds to run discovery
+- __success__: Success callback function that is invoked which each discovered device.
+- __failure__: Error callback function, invoked when error occurs. [optional]
+
+### Quick Example
+
+    ble.scanClassic([], scanSeconds, function (device) {
+		console.log('Devices: '+JSON.stringify(device));
+        $.each(device, function(i, item) {
+			devices_BT.push(item);
+        });
+    }, function (reason) {
+        __Alert.Show('Error Bluetooth Scan', reason, 'Try Again', 1);
+        Loader.Off();
+    });
 
 ## startScan
 

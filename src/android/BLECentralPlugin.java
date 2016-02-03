@@ -14,7 +14,12 @@
 
 package com.megster.cordova.ble.central;
 
+import android.content.BroadcastReceiver;
+
 import android.app.Activity;
+
+import android.content.IntentFilter;
+
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
@@ -23,21 +28,29 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 
+import android.widget.Toast;
 import android.provider.Settings;
+
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaArgs;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.LOG;
 import org.apache.cordova.PluginResult;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 
+import java.lang.reflect.Array;
 import java.util.*;
+import java.lang.String;
 
 public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.LeScanCallback {
 
     // actions
     private static final String SCAN = "scan";
+
+    private static final String SCAN_CLASSIC = "scanClassic";
+
     private static final String START_SCAN = "startScan";
     private static final String STOP_SCAN = "stopScan";
 
@@ -62,8 +75,12 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     CallbackContext discoverCallback;
     private CallbackContext enableBluetoothCallback;
 
-    private static final String TAG = "BLEPlugin";
+    private static final String TAG = "BTScan";
     private static final int REQUEST_ENABLE_BLUETOOTH = 1;
+
+    public JSONArray finalDeviceList = new JSONArray();
+
+    private ArrayList<BluetoothDevice> mDeviceList = new ArrayList<BluetoothDevice>();
 
     BluetoothAdapter bluetoothAdapter;
 
@@ -73,17 +90,38 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     @Override
     public boolean execute(String action, CordovaArgs args, CallbackContext callbackContext) throws JSONException {
 
-        LOG.d(TAG, "action = " + action);
+        LOG.e(TAG, "action = " + action);
+
+        //***********************************************
+
+        mDeviceList = new ArrayList<BluetoothDevice>();
+
+        IntentFilter filter = new IntentFilter();
+
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(BluetoothDevice.ACTION_FOUND);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+
+        webView.getContext().registerReceiver(mReceiver, filter);
+
+        //***********************************************
 
         if (bluetoothAdapter == null) {
             Activity activity = cordova.getActivity();
             BluetoothManager bluetoothManager = (BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
             bluetoothAdapter = bluetoothManager.getAdapter();
+            bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         }
 
         boolean validAction = true;
 
-        if (action.equals(SCAN)) {
+        if (action.equals(SCAN_CLASSIC)) {
+
+            int scanSeconds = args.getInt(1);
+            findClassicBluetoothDevices(callbackContext, scanSeconds);
+
+        } else if (action.equals(SCAN)) {
 
             UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
             int scanSeconds = args.getInt(1);
@@ -293,6 +331,113 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
 
     }
 
+    private void showToast(String message) {
+        Toast.makeText(cordova.getActivity().getApplicationContext(), message, Toast.LENGTH_SHORT).show();
+    }
+
+    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
+
+        public void onReceive(Context context, Intent intent) {
+
+            String action = intent.getAction();
+
+            LOG.e(TAG, "################################## BroadcastReceiver STEP action: "+action);
+
+            if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
+
+                LOG.e(TAG, "################################## BroadcastReceiver STEP [ACTION_STATE_CHANGED] ");
+
+                final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+
+                if (state == BluetoothAdapter.STATE_ON) {
+                    //showToast("Enabled");
+                }
+
+            } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
+
+                LOG.e(TAG, "################################## BroadcastReceiver STEP [ACTION_DISCOVERY_STARTED] ");
+
+            } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+
+                LOG.e(TAG, "################################## BroadcastReceiver STEP [ACTION_DISCOVERY_FINISHED] LIST OF DEVICES: " + mDeviceList);
+
+            } else if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+
+                LOG.e(TAG, "################################## BroadcastReceiver STEP [ACTION_FOUND] ");
+
+                BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                mDeviceList.add(device);
+
+                LOG.e(TAG, "###### BroadcastReceiver STEP [ACTION_FOUND] Devices:" + device.getName() + " - " + device.getAddress());
+
+                //showToast("Found device [FUCK] Device:" + device.getName() + " - " + device.getAddress());
+            }
+        }
+    };
+
+    @Override
+    public void onDestroy() {
+        webView.getContext().unregisterReceiver(mReceiver);
+
+        super.onDestroy();
+    }
+
+    public void findClassicBluetoothDevices(CallbackContext callbackContext, int scanSeconds) {
+
+        // TODO skip if currently scanning
+
+        //scanSeconds = 10;
+
+        LOG.e(TAG, "################################## START BT SCAN [1] Scan for second = "+scanSeconds);
+
+        // clear non-connected cached peripherals
+        for(Iterator<Map.Entry<String, Peripheral>> iterator = peripherals.entrySet().iterator(); iterator.hasNext(); ) {
+            Map.Entry<String, Peripheral> entry = iterator.next();
+            if(!entry.getValue().isConnected()) {
+                iterator.remove();
+            }
+        }
+
+        LOG.e(TAG, "################################## START BT SCAN [2]");
+
+        Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+        discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
+        cordova.getActivity().startActivity(discoverableIntent);
+
+        discoverCallback = callbackContext;
+
+        LOG.e(TAG, "################################## START BT DISCOVERY");
+
+        bluetoothAdapter.startDiscovery();
+
+        if (scanSeconds > 0) {
+            Handler handler = new Handler();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    LOG.d(TAG, "Stopping Scan");
+                    BLECentralPlugin.this.bluetoothAdapter.cancelDiscovery();
+
+                    LOG.e(TAG, "################################## STOP BT SCAN DISCOVERY | LIST OF DEVICES [Array]: " + mDeviceList);
+
+                    for (int i=0; i < mDeviceList.size(); i++) {
+                        finalDeviceList.put(mDeviceList.get(i).toString());
+                    }
+
+                    LOG.e(TAG, "################################## STOP BT SCAN DISCOVERY | LIST OF DEVICES [JSONArray]: " + finalDeviceList);
+
+                    PluginResult result = new PluginResult(PluginResult.Status.OK, finalDeviceList);
+                    result.setKeepCallback(true);
+                    discoverCallback.sendPluginResult(result);
+                }
+            }, scanSeconds * 1000);
+        }
+
+
+
+    }
+
 
     private void findLowEnergyDevices(CallbackContext callbackContext, UUID[] serviceUUIDs, int scanSeconds) {
 
@@ -348,6 +493,8 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
 
         String address = device.getAddress();
+
+        LOG.e(TAG, "################################## START onLeScan()");
 
         if (!peripherals.containsKey(address)) {
 

@@ -1,0 +1,54 @@
+<html>
+    <head><title>test bt</title></head>
+    <body>
+        <button type="button" onclick="start_bt_test();">Scan BT [TEST 1]</button>
+
+        <div id="debug" style="width: 100%; border: 1px solid red; height: auto; min-height: 100px;">
+
+        </div>
+
+        <script src="cordova.js"></script>
+        <script src="jquery.min.js"></script>
+        <script>
+
+            var start_bt_test = function () {
+                $('#debug').html('onDeviceReady');
+                $('#debug').append('<br />START TEST');
+
+                ble.isEnabled(
+                        function () {
+                            $('#debug').append('<br />Bluetooth is enabled...');
+                            $('#debug').append('<br />Scanning...');
+                            $('#debug').append('<br />Devices');
+
+                            ble.scanClassic([], 20, function (device) {
+                                $.each(device, function(i, item) {
+                                    $('#debug').append('<br />'+item);
+                                });
+
+                            }, function (reason) {
+                                $('#debug').append('<br />[ERROR] in scan: ' + reason);
+                            });
+
+                        },
+                        function () {
+                            $('#debug').append("<br />Bluetooth is *not* enabled");
+                            ble.showBluetoothSettings(function () {
+                                //alert('OK setting bt');
+                            }, function () {
+                                $('#debug').append('<br />errore setting bt');
+                            });
+                        }
+                );
+            };
+
+
+            document.addEventListener("deviceready", function () {
+                $('#debug').html('onDeviceReady');
+            }, false);
+
+
+
+        </script>
+    </body>
+</html>

@@ -1,3 +1,4 @@
+cordova.define("cordova-plugin-ble-central.ble", function(require, exports, module) {
 // (c) 2014 Don Coleman
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,12 +51,20 @@ function convertToNativeJS(object) {
 module.exports = {
 
     scan: function (services, seconds, success, failure) {
-        var successWrapper = function(peripheral) {
-            convertToNativeJS(peripheral);
-            success(peripheral);
-        };
-        cordova.exec(successWrapper, failure, 'BLE', 'scan', [services, seconds]);
+       var successWrapper = function(peripheral) {
+           convertToNativeJS(peripheral);
+           success(peripheral);
+       };
+       cordova.exec(successWrapper, failure, 'BLE', 'scan', [services, seconds]);
     },
+
+    scanClassic: function (services, seconds, success, failure) {
+            var successWrapper = function(devices) {
+                //JSONArray object
+                success(devices);
+            };
+            cordova.exec(successWrapper, failure, 'BLE', 'scanClassic', [services, seconds]);
+        },
 
     startScan: function (services, success, failure) {
         var successWrapper = function(peripheral) {
@@ -141,3 +150,5 @@ module.exports = {
     }
 
 };
+
+});
